@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>計算書</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+body{
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  margin:0;
+  padding:20px;
+  color:#333;
+}
+.container{
+  max-width:520px;
+  margin:auto;
+  background:#fff;
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 15px 30px rgba(0,0,0,0.3);
+}
+h2{
+  text-align:center;
+  margin-bottom:15px;
+}
+label{
+  font-size:13px;
+  color:#555;
+}
+input{
+  width:100%;
+  padding:10px;
+  margin:5px 0 12px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  font-size:15px;
+  box-sizing:border-box;
+}
+.btn-group{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:5px;
+}
+button{
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+  cursor:pointer;
+  transition:0.3s;
+}
+.btn-calc{
+  background:#2c5364;
+  color:#fff;
+}
+.btn-calc:hover{
+  background:#203a43;
+}
+.btn-reset{
+  background:#e5e7eb;
+  color:#333;
+}
+.btn-reset:hover{
+  background:#d1d5db;
+}
+.result{
+  background:#f4f7fb;
+  padding:10px;
+  border-radius:10px;
+  margin-top:10px;
+  font-weight:bold;
+  text-align:center;
+}
+.table-box{
+  margin-top:15px;
+  overflow:hidden;
+  border-radius:10px;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  text-align:center;
+}
+th{
+  background:#2c5364;
+  color:#fff;
+  padding:8px;
+}
+td{
+  padding:8px;
+  border-bottom:1px solid #eee;
+}
+.card-title{
+  margin-top:20px;
+  font-weight:bold;
+  text-align:center;
+}
+.fade-in{
+  animation:fade 0.5s ease;
+}
+@keyframes fade{
+  from{opacity:0; transform:translateY(10px);}
+  to{opacity:1; transform:translateY(0);}
+}
+.chart-wrap{
+  margin-top:20px;
+  padding:15px;
+  background:#f9fafb;
+  border-radius:12px;
+}
+.ratio-box{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+.ratio-item{
+  background:#fff;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+  border:1px solid #e5e7eb;
+}
+.ratio-item.val{
+  font-size:18px;
+  font-weight:bold;
+  color:#2c5364;
+}
+.ratio-item.label{
+  font-size:12px;
+  color:#666;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>計算書（比率分析付き）</h2>
+
+  <label>S</label>
+  <input id="S" type="number" step="any" placeholder="負債">
+
+  <label>B</label>
+  <input id="B" type="number" step="any" placeholder="総資産">
+
+  <label>O1</label>
+  <input id="O1" type="number" step="any" placeholder="係数1">
+
+  <label>O2</label>
+  <input id="O2" type="number" step="any" placeholder="係数2">
+
+  <div class="btn-group">
+    <button class="btn-calc" onclick="calc()">計算して送信</button>
+    <button class="btn-reset" onclick="resetForm()">リセット</button>
+  </div>
+
+  <div class="result fade-in">
+    結果 T = <span id="result">-</span>
+  </div>
+
+  <div class="card-title">貸借対照表</div>
+  <div class="table-box fade-in">
+    <table>
+      <tr>
+        <th>借方</th><th>金額</th>
+        <th>貸方</th><th>金額</th>
+      </tr>
+      <tr>
+        <td>流動資産</td>
+        <td id="ca">-</td>
+        <td>流動負債</td>
+        <td id="cl">-</td>
+      </tr>
+      <tr>
+        <td>固定資産</td>
+        <td id="fa">-</td>
+        <td>資本金</td>
+        <td id="capital">-</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card-title">比率分析</div>
+  <div class="ratio-box fade-in">
+    <div class="ratio-item">
+      <div class="val" id="currentRatio">-</div>
+      <div class="label">流動比率 %</div>
+    </div>
+    <div class="ratio-item">
+      <div class="val" id="fixedRatio">-</div>
+      <div class="label">固定比率 %</div>
+    </div>
+    <div class="ratio-item">
+      <div class="val" id="equityRatio">-</div>
+      <div class="label">自己資本比率 %</div>
+    </div>
+    <div class="ratio-item">
+      <div class="val" id="debtRatio">-</div>
+      <div class="label">負債比率 %</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap fade-in">
+    <canvas id="ratioChart"></canvas>
+  </div>
+</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbx5EYS1tfjoO9nTrn2WuATBnC3KZe6c73OkBwNSCWPP7KyX7Zr0bThxSqZN8i_R8orCAw/exec";
+let chart = null;
+
+function calc(){
+  const S = Number(document.getElementById("S").value);
+  const B = Number(document.getElementById("B").value);
+  const O1 = Number(document.getElementById("O1").value);
+  const O2 = Number(document.getElementById("O2").value);
+
+  if (!isFinite(S) ||!isFinite(B) ||!isFinite(O1) ||!isFinite(O2) || O1===0 || O2===0){
+    alert("有効な数値を入力してください");
+    return;
+  }
+
+  const T1 = (B - S) / O1;
+  const T2 = (B - S) / O2;
+  const currentAssets = O1 * T2;
+  const currentLiabilities = O2 * T1;
+  const fixedAssets = B - currentAssets;
+  const capital = B - currentLiabilities;
+
+  document.getElementById("ca").textContent = currentAssets.toFixed(2);
+  document.getElementById("cl").textContent = currentLiabilities.toFixed(2);
+  document.getElementById("fa").textContent = fixedAssets.toFixed(2);
+  document.getElementById("capital").textContent = capital.toFixed(2);
+
+  const Traw = B - S - O1 - O2;
+  if (!isFinite(Traw)){
+    alert("計算エラー");
+    return;
+  }
+  const T = Traw.toFixed(2);
+  document.getElementById("result").textContent = T;
+
+  const currentRatio = currentLiabilities === 0? 0 : (currentAssets / currentLiabilities) * 100;
+  const fixedRatio = capital === 0? 0 : (fixedAssets / capital) * 100;
+  const equityRatio = B === 0? 0 : (capital / B) * 100;
+  const debtRatio = B === 0? 0 : (S / B) * 100;
+
+  document.getElementById("currentRatio").textContent = currentRatio.toFixed(1);
+  document.getElementById("fixedRatio").textContent = fixedRatio.toFixed(1);
+  document.getElementById("equityRatio").textContent = equityRatio.toFixed(1);
+  document.getElementById("debtRatio").textContent = debtRatio.toFixed(1);
+
+  updateChart(capital, currentLiabilities);
+
+  const callbackName = "cb_" + Date.now();
+  window[callbackName] = function(res){
+    console.log("GAS応答:", res);
+    delete window[callbackName];
+  };
+  const script = document.createElement("script");
+  script.src = GAS_URL +
+    "?t=" + encodeURIComponent(T) +
+    "&callback=" + callbackName +
+    "&_=" + Date.now();
+  document.body.appendChild(script);
+}
+
+function resetForm(){
+  document.getElementById("S").value = "";
+  document.getElementById("B").value = "";
+  document.getElementById("O1").value = "";
+  document.getElementById("O2").value = "";
+
+  document.getElementById("result").textContent = "-";
+  document.getElementById("ca").textContent = "-";
+  document.getElementById("cl").textContent = "-";
+  document.getElementById("fa").textContent = "-";
+  document.getElementById("capital").textContent = "-";
+  document.getElementById("currentRatio").textContent = "-";
+  document.getElementById("fixedRatio").textContent = "-";
+  document.getElementById("equityRatio").textContent = "-";
+  document.getElementById("debtRatio").textContent = "-";
+
+  if(chart){
+    chart.destroy();
+    chart = null;
+  }
+}
+
+function updateChart(capital, liabilities){
+  const ctx = document.getElementById('ratioChart').getContext('2d');
+
+  if(chart){
+    chart.destroy();
+  }
+
+  chart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: ['自己資本', '負債'],
+      datasets: [{
+        data: [capital, liabilities],
+        backgroundColor: ['#2c5364', '#f59e0b'],
+        borderColor: '#fff',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 14 } }
+        },
+        title: {
+          display: true,
+          text: '資本構成',
+          font: { size: 16, weight: 'bold' }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context){
+              let label = context.label || '';
+              let value = context.parsed;
+              let total = context.dataset.data.reduce((a,b)=>a+b,0);
+              let percent = total === 0? 0 : (value / total * 100).toFixed(1);
+              return `${label}: ${value.toFixed(2)} (${percent}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
